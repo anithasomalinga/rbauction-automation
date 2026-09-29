@@ -67,7 +67,8 @@ export const CategoryCountSchema = z.object({
   category: z.string().min(1),
   categoryLocalized: z.string().min(1),
   categorySeoValue: z.string().min(1),
-  totalAssets: count,
+  // Always present in current data; the requirement (A2.4) only asks for a valid number when present
+  totalAssets: count.optional(),
   assetTypes: z.array(AssetTypeCountSchema),
 });
 

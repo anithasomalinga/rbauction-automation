@@ -29,6 +29,8 @@ export default tseslint.config(
       ...playwright.configs['flat/recommended'].rules,
       'playwright/no-wait-for-timeout': 'error',
       'playwright/no-focused-test': 'error',
+      // Data-dependent skips (e.g. "yard has no upcoming events") are legitimate; unconditional ones are not
+      'playwright/no-skipped-test': ['warn', { allowConditional: true }],
     },
   },
 
