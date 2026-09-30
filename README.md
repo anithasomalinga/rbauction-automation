@@ -8,8 +8,8 @@ The framework is designed for **simplicity, reusability, extensibility and maint
 one runner for UI and API tests, a strict layered structure, and schema-validated, data-driven
 tests that stay stable against a live production site.
 
-> **Status:** framework (phases 1–2) and all API tests (API 1–3) are complete. UI scenarios S1–S4
-> are in progress; see [Requirement coverage](#requirement-coverage) and [Roadmap](#roadmap).
+> **Status:** framework, API tests (API 1–3) and UI happy-path scenarios (1–4) are complete:
+> 35 tests (17 API, 18 UI). CI is next; see [Requirement coverage](#requirement-coverage) and [Roadmap](#roadmap).
 
 ---
 
@@ -103,7 +103,8 @@ Adding an environment (e.g. staging) is one entry in `config/environments.ts`.
 │   │   │   ├── LocationsClient.ts   # yards list (API 1) and yard page (API 2)
 │   │   │   └── SearchApiClient.ts   # POST /api/search (API 3)
 │   │   └── schemas/                 # Zod contracts; types are inferred from them
-│   ├── pages/                       # page objects and components (UI; in progress)
+│   ├── pages/                       # BasePage, LocationsPage, YardDetailPage, SearchResultsPage
+│   │   └── components/              # CookieBanner (auto-dismiss handler)
 │   ├── fixtures/                    # Playwright fixtures; `@fixtures` is the single import for specs
 │   ├── data/                        # reference data, thresholds, payload builders
 │   └── utils/                       # WAF guard, __NEXT_DATA__ parser, schema validation, report counts
@@ -216,14 +217,66 @@ First 5 titles:
 
 The order of results varies between requests (see observation 2), so the titles differ from run to run.
 
-### UI scenarios S1–S4: planned
+### UI scenarios (happy path)
 
-| Scenario | Spec |
-|---|---|
-| S1: Locations directory (`/lp`) | `tests/ui/s1-locations-directory.spec.ts` |
-| S2: Open a yard from the directory | `tests/ui/s2-open-yard.spec.ts` |
-| S3: Edmonton yard page | `tests/ui/s3-edmonton-yard.spec.ts` |
-| S4: Edmonton inventory search | `tests/ui/s4-edmonton-search.spec.ts` |
+UI tests run in Chromium (headed, see [Observations](#observations-about-the-site-under-test)).
+Locators are role- and label-based (`getByRole('list', { name: 'Canada' })`, section headings,
+existing `data-testid`s); there are no CSS class selectors. The cookie banner is dismissed
+automatically whenever it gets in the way (`page.addLocatorHandler`).
+
+#### Scenario 1: locations directory (`/lp`): ✅ done
+
+Spec: [`tests/ui/s1-locations-directory.spec.ts`](tests/ui/s1-locations-directory.spec.ts) · tag `@S1`
+
+| ID | Validation | How it is verified | Live value (2026-09-29) |
+|---|---|---|---|
+| 1.1 | Title/heading is the locations directory; intro says "over 60 permanent auction sites and local yards" | Page title, `h1` "Locations", visible intro text | ✅ |
+| 1.2 | Satellite note (asterisk) is visible | Visible note text | ✅ |
+| 1.3 | Country `h4` headings counted; first two are United States and Canada; required countries present | Headings read after scrolling below the map | 16 countries |
+| 1.4 | United States: more than 20 sites, incl. Phoenix, Salt Lake City, Houston, Las Vegas, Atlanta | Links of the list labelled "United States" | 31 |
+| 1.5 | Canada: more than 10 sites, incl. Edmonton, Montreal, Toronto, Regina, Saskatoon | Links of the list labelled "Canada" | 17 |
+| 1.6 | Satellite (*) > 15, permanent > 25, total > 60 | Every site in the directory, classified by its trailing `*` | 31 / 43 / 74 |
+| 1.7 | San Antonio and Calgary, AB have `*`; Phoenix and Edmonton don't | Looked up by name (asterisk stripped) | ✅ |
+| 1.9 | Both tabs available; Local representatives shows "Search for representatives" | `aria-selected` switches and the prompt appears only after switching | ✅ |
+
+The brief has no item 1.8, so none is implemented. The UI counts match API 1 exactly (31 + 43 = 74 sites, 16 countries).
+
+#### Scenario 2: open a yard from the directory: ✅ done
+
+Spec: [`tests/ui/s2-open-yard.spec.ts`](tests/ui/s2-open-yard.spec.ts) · tag `@S2`
+
+| ID | Validation | How it is verified |
+|---|---|---|
+| 2.1 | Edmonton is listed under Canada, not a satellite | Found in the Canada list without an asterisk |
+| 2.2 | Clicking Edmonton opens its yard page | URL ends with `/lp/edmonton-ab`; yard name heading is "Edmonton" |
+
+#### Scenario 3: Edmonton yard page (`/lp/edmonton-ab`): ✅ done
+
+Spec: [`tests/ui/s3-edmonton-yard.spec.ts`](tests/ui/s3-edmonton-yard.spec.ts) · tag `@S3`
+
+| ID | Validation | How it is verified | Live value (2026-09-29) |
+|---|---|---|---|
+| 3.1 | Address has 1500 Sparrow Drive, Nisku, AB, T9E 8H6; office hours have Mon - Fri and a time range; phone shown | Text under the Address / Office hours labels; phone link | Mon - Fri, 08:00 AM - 05:00 PM |
+| 3.2 | Auction events heading after Details; ≥ 1 event card, each with a date range and a title | Section order, then each card's date range and title | 2 cards |
+| 3.3 | About this yard is visible and mentions weekday drop-off, inspection and pick-up | Section text | ✅ |
+| 3.4 | Items in yard carousel: all category cards (off-screen slides included) > 5, each with a name and "N items"; includes Excavators and one of Harvesting Equipment / Agricultural Tractors / Sprayers / Excavator Attachments | Cards read from the DOM (not only visible tiles) | 41 cards |
+| 3.5 | Become a seller form visible with a phone number, not submitted | Form and `tel:` link; nothing is typed or submitted | +1-866-901-2104 |
+| 3.6 | Representatives tab: ≥ 1 card with a region and a phone/mobile/email | Cards in the opened tab panel | 23 cards |
+
+**Note on 3.2:** at desktop width, Details and Auction events are side by side, so "below Details"
+is checked as **reading order** (Auction events follows Details), which holds in every layout.
+The 41 carousel cards match the 41 distinct categories from API 2.
+
+#### Scenario 4: Edmonton inventory search (`/search?freeText=Edmonton`): ✅ done
+
+Spec: [`tests/ui/s4-edmonton-search.spec.ts`](tests/ui/s4-edmonton-search.spec.ts) · tag `@S4`
+
+| ID | Validation | How it is verified | Live value (2026-09-29) |
+|---|---|---|---|
+| 4.1 | Search view opens with Edmonton as the query | URL, search box value, results header, first result card visible | ✅ |
+| 4.2 | Displayed total > 0 (parsed, not counted); each first-page lot has a title; location/closing date non-empty where shown; log total and first 5 titles | Total parsed from "1-60 of N" (exact) with the "2.1k results" header as fallback; card fields checked | 2,136 (header 2.1k) |
+
+The displayed total equals `totalAmount` from API 3 (2,136).
 
 ## Observations about the site under test
 
@@ -259,7 +312,7 @@ for triage; the tests are written so that they don't hide or trip over them.
 
 - **Imports:** specs import `test` and `expect` from `@fixtures`, never directly from `@playwright/test`.
 - **Naming:** specs are `api{n}-*.spec.ts` / `s{n}-*.spec.ts`; test titles start with the requirement ID (`A1.4 …`).
-- **Tags:** `@API1`–`@API3`, `@S1`–`@S4` per requirement group; `@smoke` for the fast critical subset.
+- **Tags:** `@API1`–`@API3` and `@S1`–`@S4` (Scenarios 1–4) per requirement group; `@smoke` for the fast critical subset.
 - **Data-dependent skips:** when a requirement is conditional ("if the yard has events"), use `test.skip(condition, reason)` so the report shows why, instead of passing silently.
 - **Assertions:** give counts a message (`expect(n, 'satellite locations')`), use `expect.soft` when checking several independent items, and list offenders instead of asserting a boolean.
 - **No hard waits:** `waitForTimeout`, `networkidle` and `force: true` are lint errors; use web-first assertions.
@@ -285,6 +338,6 @@ for triage; the tests are written so that they don't hide or trip over them.
 | 1 | Scaffold: Playwright, TypeScript, config, ESLint | ✅ |
 | 2 | API layer: WAF guard, clients, schemas, fixtures | ✅ |
 | 3 | API tests: API 1, API 2, API 3 | ✅ |
-| 4 | UI layer: page objects, components, UI fixtures | Planned |
-| 5 | UI tests: S1–S4 | Planned |
+| 4 | UI layer: page objects, components, UI fixtures | ✅ |
+| 5 | UI tests: Scenarios 1–4 (happy path) | ✅ |
 | 6 | CI (GitHub Actions) and final documentation | Planned |

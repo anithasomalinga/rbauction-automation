@@ -2,7 +2,7 @@ import { test, expect } from '@fixtures';
 import { SearchResponseSchema } from '@api/schemas/search.schema';
 import { buildSearch } from '@data/searchPayloads';
 import { EDMONTON } from '@data/yards';
-import { recordCount } from '@utils/report';
+import { logTotalAndTitles, recordCount } from '@utils/report';
 
 /**
  * API 3: Edmonton inventory search, POST /api/search with freeText "Edmonton"; the API behind
@@ -47,13 +47,7 @@ test.describe('API 3: Edmonton inventory search (POST /api/search)', { tag: '@AP
     const { results } = await searchApi.search(buildSearch(SEARCH_TEXT));
     const titles = results.records.slice(0, TITLES_TO_LOG).map((record) => record.assetDescription);
 
-    console.log(
-      [
-        `Search "${SEARCH_TEXT}": ${results.totalAmount} total results`,
-        `First ${titles.length} titles:`,
-        ...titles.map((title, index) => `  ${index + 1}. ${title}`),
-      ].join('\n'),
-    );
+    logTotalAndTitles(SEARCH_TEXT, results.totalAmount, titles);
 
     expect(titles, 'titles logged').toHaveLength(TITLES_TO_LOG);
   });
