@@ -144,6 +144,30 @@ In Command Prompt, use `copy` in place of `cp` for the last command.
 - **Development:** `@playwright/test`, `typescript`, `dotenv`, `eslint`, `typescript-eslint`,
   `eslint-plugin-playwright`, `@eslint/js`, `@types/node`
 
+### Linux without a screen (GitHub Codespaces, CI, Docker)
+
+Windows and macOS need nothing more. A Linux machine with no desktop, such as a GitHub Codespace,
+needs two extra things:
+
+- **Chromium's system libraries.** A bare Linux image doesn't include them, and the browser fails
+  to start without them. Install the browser with this command in place of
+  `npm run install:browsers`; it also installs the libraries and Xvfb (it uses `sudo`):
+
+  ```bash
+  npm run install:browsers:linux
+  ```
+
+- **A virtual display.** The tests open a visible browser window (see
+  [Akamai bot protection](#akamai-bot-protection)), and there is no screen to open it on. Xvfb
+  provides one in memory. Run the tests with this command in place of `npm test`:
+
+  ```bash
+  npm run test:xvfb                          # all tests
+  npm run test:xvfb -- --project=chromium    # E2E tests only
+  ```
+
+The API tests use no browser, so `npm run test:api` works there as it is.
+
 ## How to run the tests and view the reports
 
 ```bash
@@ -170,6 +194,38 @@ the test step by step; open it from the report, or with:
 ```bash
 npm run trace -- test-results/<test-folder>/trace.zip
 ```
+
+## Challenges and observations
+
+Two things about the live site shaped how the framework is built.
+
+### Akamai bot protection
+
+rbauction.com sits behind Akamai's bot protection, which refuses traffic that looks automated.
+
+- **What happened:** headless Chromium and `curl` received HTTP 403 "Access Denied". A headed
+  (visible) Chromium window and Playwright's API client were allowed.
+- **How it is handled:** browsers run headed by default; headless is opt-in through `HEADLESS=true`
+  for environments without the protection. The framework does not try to get around the protection.
+- **Clear failures:** every response passes through a small guard. If a request is blocked, the
+  test fails straight away with `WafBlockedError`, which marks it as an environment issue and
+  not a product defect, instead of a confusing timeout.
+- **On CI:** the GitHub Actions runner has no screen, so the browser runs headed on a virtual
+  display (`xvfb-run`). The runner was not blocked, and all tests passed there.
+
+### Cookie consent pop-up
+
+The site shows a cookie consent banner with an "I understand" button. It appears a moment after
+the page loads, at no fixed time, and can cover the controls a test needs.
+
+- **How it is handled:** dismissing it at a fixed step would be unreliable, so a Playwright
+  locator handler ([`CookieBanner.ts`](src/pages/components/CookieBanner.ts)) clicks the banner
+  away whenever it gets in the way of an action. It is registered for every page through the fixtures.
+- **What went wrong on CI:** two tests failed on the first CI run. A page object read all 16
+  country lists at the same time, each read triggered the handler, and after the first one
+  dismissed the banner the others kept waiting for a banner that was already gone.
+- **The fix:** page objects now read items one at a time. The problem never appeared on a local
+  machine, only under CI timing.
 
 ## AI Assistance
 

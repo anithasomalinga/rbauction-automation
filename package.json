@@ -9,7 +9,9 @@
   },
   "scripts": {
     "install:browsers": "playwright install chromium",
+    "install:browsers:linux": "playwright install --with-deps chromium",
     "test": "playwright test",
+    "test:xvfb": "xvfb-run --auto-servernum playwright test",
     "test:api": "playwright test --project=api",
     "test:e2e": "playwright test --project=chromium",
     "test:smoke": "playwright test --grep @smoke",
