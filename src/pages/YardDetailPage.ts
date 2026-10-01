@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { yardPath } from '@api/clients/LocationsClient';
 import { BasePage } from '@pages/BasePage';
+import { extractNextData } from '@utils/nextData';
 
 export interface EventCard {
   dateRange: string;
@@ -29,10 +30,16 @@ export class YardDetailPage extends BasePage {
   readonly phone: Locator;
   readonly auctionEventsHeading: Locator;
   readonly eventCards: Locator;
+  /** Shown in place of event cards when the yard has no upcoming events */
+  readonly noEventsMessage: Locator;
+  readonly auctionCalendarLink: Locator;
   readonly aboutHeading: Locator;
   readonly aboutSection: Locator;
   /** Category cards of the "Items in yard" carousel, including off-screen slides */
   readonly categoryCards: Locator;
+  /** Absent when the yard has no inventory */
+  readonly itemsInYardHeading: Locator;
+  readonly additionalInfoHeading: Locator;
   readonly sellerForm: Locator;
   readonly sellerPhone: Locator;
   readonly representativesTab: Locator;
@@ -50,12 +57,18 @@ export class YardDetailPage extends BasePage {
     const eventCard = page.getByTestId(/^auction-card-\d+$/);
     this.eventCards = this.section('Auction events', eventCard).locator(eventCard);
 
+    this.noEventsMessage = page.getByText('There are currently no events at this location');
+    this.auctionCalendarLink = page.getByRole('link', { name: 'See full auction calendar' });
+
     this.aboutHeading = this.sectionHeading('About this yard');
     this.aboutSection = this.section('About this yard', page.locator('p'));
 
     // Category cards are links with a name heading; "See all" has none
     const categoryCard = page.getByRole('link').filter({ has: page.getByRole('heading', { level: 6 }) });
     this.categoryCards = this.section('Items in yard', categoryCard).locator(categoryCard);
+
+    this.itemsInYardHeading = this.sectionHeading('Items in yard');
+    this.additionalInfoHeading = this.sectionHeading('Additional information');
 
     this.sellerForm = page
       .locator('div', { has: page.getByRole('heading', { name: 'Become a seller', exact: true }) })
@@ -77,6 +90,16 @@ export class YardDetailPage extends BasePage {
     const titles = this.page.getByRole('tabpanel').getByRole('heading', { level: 4 });
     await titles.first().waitFor();
     return (await titles.allInnerTexts()).map((title) => title.trim());
+  }
+
+  /** Number of upcoming events in the page's own embedded data (__NEXT_DATA__), not the rendered cards. */
+  async getUpcomingEventCount(): Promise<number> {
+    return (await this.getEmbeddedPageProps()).upcomingEvents?.length ?? 0;
+  }
+
+  /** Number of inventory groups in the page's own embedded data; 0 when the yard has no inventory. */
+  async getInventoryGroupCount(): Promise<number> {
+    return (await this.getEmbeddedPageProps()).itemsInYard?.length ?? 0;
   }
 
   async getEventCards(): Promise<EventCard[]> {
@@ -121,6 +144,14 @@ export class YardDetailPage extends BasePage {
         };
       }),
     );
+  }
+
+  private async getEmbeddedPageProps(): Promise<{ upcomingEvents?: unknown[]; itemsInYard?: unknown[] | null }> {
+    const html = await this.page.content();
+    return extractNextData(html, this.page.url()).props.pageProps as {
+      upcomingEvents?: unknown[];
+      itemsInYard?: unknown[] | null;
+    };
   }
 
   private sectionHeading(title: string): Locator {

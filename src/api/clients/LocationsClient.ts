@@ -1,3 +1,4 @@
+import type { ApiResponse } from '@api/clients/BaseApiClient';
 import type { NextDataClient, PageDataSource } from '@api/clients/NextDataClient';
 import {
   LocationsPageSchema,
@@ -31,5 +32,18 @@ export class LocationsClient {
   /** Yard details, upcoming events, items in yard and representatives, from one payload (API 2). */
   getYardPage(slug: string, source?: PageDataSource): Promise<YardPage> {
     return this.nextData.getPageProps(yardPath(slug), YardPageSchema, source);
+  }
+
+  /**
+   * Raw response of the locations directory's data route (status and header checks).
+   * Pass a `buildId` to request a specific deployment instead of the current one.
+   */
+  getYardsRaw(buildId?: string): Promise<ApiResponse> {
+    return this.nextData.getDataRouteRaw(LOCATIONS_PATH, buildId);
+  }
+
+  /** Raw JSON response of a yard page's data route (status and header checks). */
+  getYardPageRaw(slug: string): Promise<ApiResponse> {
+    return this.nextData.getDataRouteRaw(yardPath(slug));
   }
 }

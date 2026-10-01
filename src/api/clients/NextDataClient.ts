@@ -1,6 +1,6 @@
 import type { APIRequestContext } from '@playwright/test';
 import { z } from 'zod';
-import { BaseApiClient } from '@api/clients/BaseApiClient';
+import { BaseApiClient, type ApiResponse } from '@api/clients/BaseApiClient';
 import { extractNextData, type NextData } from '@utils/nextData';
 import { validate } from '@utils/validate';
 
@@ -53,7 +53,13 @@ export class NextDataClient extends BaseApiClient {
     return this.buildId;
   }
 
-  private async getDataRoute(path: string): Promise<{ pageProps: unknown }> {
+  /**
+   * Raw data-route response of the page at `path`, whatever its status (status and header checks).
+   * With a `buildId`, that exact deployment is requested and the response returned as is (negative tests).
+   */
+  async getDataRouteRaw(path: string, buildId?: string): Promise<ApiResponse> {
+    if (buildId) return this.send('GET', this.dataRoutePath(buildId, path));
+
     let response = await this.send('GET', this.dataRoutePath(await this.getBuildId(), path));
 
     // A deployment during the run invalidates the cached buildId (404): refresh it and retry once
@@ -61,7 +67,11 @@ export class NextDataClient extends BaseApiClient {
       this.buildId = undefined;
       response = await this.send('GET', this.dataRoutePath(await this.getBuildId(), path));
     }
+    return response;
+  }
 
+  private async getDataRoute(path: string): Promise<{ pageProps: unknown }> {
+    const response = await this.getDataRouteRaw(path);
     await response.assertOk();
     return response.json(DataRouteSchema);
   }

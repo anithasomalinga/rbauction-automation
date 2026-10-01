@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { clockTime, count, isoDateTime, latitude, longitude } from '@api/schemas/common.schema';
+import {
+  clockTime,
+  count,
+  countryCode,
+  isoDateTime,
+  latitude,
+  longitude,
+} from '@api/schemas/common.schema';
 
 /*
  * Contracts for yard (auction site) data in the /lp and /lp/{slug} page JSON.
@@ -16,7 +23,7 @@ export const AddressSchema = z.object({
   provinceStateCode: z.string().nullable(),
   zipPostalCode: z.string(),
   country: z.string().min(1),
-  countryCode: z.string().length(3),
+  countryCode,
   latitude,
   longitude,
 });

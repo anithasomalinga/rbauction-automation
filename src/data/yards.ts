@@ -50,6 +50,9 @@ export const EDMONTON_YARD_PAGE = {
   expectedCategory: 'Excavators',
 } as const;
 
+/** A slug no yard has, for the not-found cases (2.3, A2.5) */
+export const UNKNOWN_YARD_SLUG = 'does-not-exist';
+
 export const CANADA = { name: 'Canada', code: 'CAN' } as const;
 export const UNITED_STATES = { name: 'United States', code: 'USA' } as const;
 

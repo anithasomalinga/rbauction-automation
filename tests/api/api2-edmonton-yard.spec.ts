@@ -1,7 +1,25 @@
 import { test, expect } from '@fixtures';
-import { flattenCategories } from '@api/clients/LocationsClient';
-import { EDMONTON, EDMONTON_YARD_PAGE } from '@data/yards';
+import { flattenCategories, type LocationsClient } from '@api/clients/LocationsClient';
+import type { YardPage } from '@api/schemas/yard.schema';
+import { SPARSE_YARDS } from '@data/yardPage';
+import { EDMONTON, EDMONTON_YARD_PAGE, UNKNOWN_YARD_SLUG } from '@data/yards';
 import { recordCount } from '@utils/report';
+
+/** Fetches the candidates in turn and stops at the first whose payload still has no inventory. */
+async function firstWithNoInventory(
+  locations: LocationsClient,
+  slugs: readonly string[],
+): Promise<YardPage | undefined> {
+  for (const slug of slugs) {
+    const page = await locations.getYardPage(slug);
+    if (page.itemsInYard.length === 0) {
+      // Shown under the test in the HTML report
+      test.info().annotations.push({ type: 'yard', description: slug });
+      return page;
+    }
+  }
+  return undefined;
+}
 
 /**
  * API 2: Edmonton yard page JSON (/lp/edmonton-ab). Yard details, upcoming events and items in
@@ -9,19 +27,21 @@ import { recordCount } from '@utils/report';
  */
 test.describe('API 2: Edmonton yard page JSON (/lp/edmonton-ab)', { tag: '@API2' }, () => {
   test('A2.1 payload is JSON', { tag: '@smoke' }, async ({ locations }) => {
-    const page = await locations.getYardPage(EDMONTON.slug);
+    const response = await locations.getYardPageRaw(EDMONTON.slug);
 
-    expect(page.yardDetails).toBeDefined();
-    expect(Array.isArray(page.upcomingEvents)).toBe(true);
-    expect(Array.isArray(page.itemsInYard)).toBe(true);
-  });
+    expect(response.status).toBe(200);
+    expect(response.header('content-type')).toContain('application/json');
+    await expect(response.json()).resolves.toBeDefined();
 
-  test('A2.1 embedded page JSON matches the Next.js data route', async ({ locations }) => {
     const [embedded, dataRoute] = await Promise.all([
       locations.getYardPage(EDMONTON.slug, 'html'),
       locations.getYardPage(EDMONTON.slug, 'dataRoute'),
     ]);
 
+    expect(embedded.yardDetails).toBeDefined();
+    expect(Array.isArray(embedded.upcomingEvents)).toBe(true);
+    expect(Array.isArray(embedded.itemsInYard)).toBe(true);
+    // The JSON embedded in the page and the Next.js data route carry the same yard
     expect(dataRoute.yardDetails).toEqual(embedded.yardDetails);
   });
 
@@ -41,9 +61,7 @@ test.describe('API 2: Edmonton yard page JSON (/lp/edmonton-ab)', { tag: '@API2'
     expect(yardDetails.pickupHoursTo, 'hours to').not.toBeNull();
   });
 
-  test('A2.3 upcoming events are counted and each has a name and a date range', async ({
-    locations,
-  }) => {
+  test('A2.3 upcoming events are counted and each has a name and a date range', async ({ locations }) => {
     const { upcomingEvents } = await locations.getYardPage(EDMONTON.slug);
     recordCount('upcoming events', upcomingEvents.length);
 
@@ -67,9 +85,7 @@ test.describe('API 2: Edmonton yard page JSON (/lp/edmonton-ab)', { tag: '@API2'
     expect(matching.length, 'events referring to Edmonton or Nisku').toBeGreaterThanOrEqual(1);
   });
 
-  test('A2.4 items in yard: more than 5 named categories with valid quantities, including Excavators', async ({
-    locations,
-  }) => {
+  test('A2.4 items in yard: more than 5 named categories with valid quantities, including Excavators', async ({ locations }) => {
     const { itemsInYard } = await locations.getYardPage(EDMONTON.slug);
     const categories = flattenCategories(itemsInYard);
     // The same category appears once per sale event, so count distinct names
@@ -88,5 +104,31 @@ test.describe('API 2: Edmonton yard page JSON (/lp/edmonton-ab)', { tag: '@API2'
     expect(invalidQuantity, 'categories with an invalid totalAssets').toEqual([]);
 
     expect([...distinctNames]).toContain(EDMONTON_YARD_PAGE.expectedCategory);
+  });
+
+  test('A2.5 an unknown yard slug returns no yard data', { tag: '@negative' }, async ({ locations }) => {
+    const response = await locations.getYardPageRaw(UNKNOWN_YARD_SLUG);
+
+    // The data route answers 200 with a redirect instruction to the not-found page, not with a yard
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ pageProps: { __N_REDIRECT: '/not-found' } });
+    expect(body).not.toHaveProperty('pageProps.yardDetails');
+
+    // The client reports it as a schema error; it never returns an empty yard
+    await expect(locations.getYardPage(UNKNOWN_YARD_SLUG)).rejects.toThrow(
+      /does not match the expected schema/,
+    );
+  });
+
+  test('A2.6 a yard with no inventory still returns a valid payload', { tag: '@negative' }, async ({ locations }) => {
+    const page = await firstWithNoInventory(locations, SPARSE_YARDS.noInventory);
+    test.skip(!page, `all of ${SPARSE_YARDS.noInventory.join(', ')} have inventory right now`);
+
+    // The site sends itemsInYard as null for these yards; the schema accepts it as an empty list
+    expect(page!.itemsInYard).toEqual([]);
+    expect(flattenCategories(page!.itemsInYard)).toEqual([]);
+    expect(page!.yardDetails.name.trim(), 'yard name').not.toBe('');
+    expect(Array.isArray(page!.upcomingEvents)).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
 {
-  "name": "rbauction-test-automation",
+  "name": "rbauction-automation",
   "version": "1.0.0",
   "description": "Playwright + TypeScript UI and API test automation framework for rbauction.com",
   "private": true,
@@ -8,13 +8,16 @@
     "node": ">=20"
   },
   "scripts": {
+    "install:browsers": "playwright install chromium",
     "test": "playwright test",
     "test:api": "playwright test --project=api",
-    "test:ui": "playwright test --project=chromium",
+    "test:e2e": "playwright test --project=chromium",
     "test:smoke": "playwright test --grep @smoke",
+    "test:negative": "playwright test --grep @negative",
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
     "report": "playwright show-report",
+    "trace": "playwright show-trace",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"

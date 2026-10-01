@@ -1,6 +1,6 @@
 import { test, expect } from '@fixtures';
 import { SearchResponseSchema } from '@api/schemas/search.schema';
-import { buildSearch } from '@data/searchPayloads';
+import { buildSearch, NO_MATCH_SEARCH_TEXT } from '@data/searchPayloads';
 import { EDMONTON } from '@data/yards';
 import { logTotalAndTitles, recordCount } from '@utils/report';
 
@@ -20,18 +20,14 @@ test.describe('API 3: Edmonton inventory search (POST /api/search)', { tag: '@AP
     await expect(response.json(SearchResponseSchema)).resolves.toBeDefined();
   });
 
-  test('A3.2 total hit count (results.totalAmount) is greater than 0', { tag: '@smoke' }, async ({
-    searchApi,
-  }) => {
+  test('A3.2 total hit count (results.totalAmount) is greater than 0', { tag: '@smoke' }, async ({ searchApi }) => {
     const { results } = await searchApi.search(buildSearch(SEARCH_TEXT));
     recordCount('total results', results.totalAmount);
 
     expect(results.totalAmount, 'results.totalAmount').toBeGreaterThan(0);
   });
 
-  test('A3.3 first page of records is non-empty and each record has an assetDescription', async ({
-    searchApi,
-  }) => {
+  test('A3.3 first page of records is non-empty and each record has an assetDescription', async ({ searchApi }) => {
     const { results } = await searchApi.search(buildSearch(SEARCH_TEXT));
     recordCount('records on first page', results.records.length);
 
@@ -50,5 +46,17 @@ test.describe('API 3: Edmonton inventory search (POST /api/search)', { tag: '@AP
     logTotalAndTitles(SEARCH_TEXT, results.totalAmount, titles);
 
     expect(titles, 'titles logged').toHaveLength(TITLES_TO_LOG);
+  });
+
+  test('A3.5 a search with no matches returns zero results, not an error', { tag: '@negative' }, async ({ searchApi }) => {
+    const response = await searchApi.searchRaw(buildSearch(NO_MATCH_SEARCH_TEXT));
+
+    expect(response.status).toBe(200);
+    const { results } = await response.json(SearchResponseSchema);
+    expect(results.totalAmount, 'results.totalAmount').toBe(0);
+    expect(results.returnedAmount, 'results.returnedAmount').toBe(0);
+    // The site omits `records` here; the schema normalises it to []
+    expect(results.records).toEqual([]);
+    expect(results.fallbackApplied, 'results.fallbackApplied').toBe(true);
   });
 });

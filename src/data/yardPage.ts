@@ -17,3 +17,14 @@ export const EDMONTON_YARD_PAGE_UI = {
   anyOfCategories: ['Harvesting Equipment', 'Agricultural Tractors', 'Sprayers', 'Excavator Attachments'],
   phoneNumber: /\d{3}\D?\d{3}\D?\d{4}/,
 } as const;
+
+/**
+ * Yards with missing data (Scenario 5, A2.6), as of 2026-09-30. Inventory and events change, so these are
+ * candidates only: a test uses the first one that still matches and skips when none does.
+ */
+export const SPARSE_YARDS = {
+  /** No inventory; the first two have upcoming events */
+  noInventory: ['montreal-qc', 'polotitlan-mex', 'leipzig-deu'],
+  /** No upcoming events, but with inventory */
+  noEvents: ['calgary-ab', 'houston-tx', 'sacramento-ca'],
+} as const;

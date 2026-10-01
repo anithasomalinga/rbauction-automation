@@ -1,6 +1,9 @@
 import type { Locator, Page } from '@playwright/test';
 import { LOCATIONS_PATH } from '@api/clients/LocationsClient';
+import { LocationsPageSchema, type Yard } from '@api/schemas/yard.schema';
 import { BasePage } from '@pages/BasePage';
+import { extractNextData } from '@utils/nextData';
+import { validate } from '@utils/validate';
 
 /** A site link in the directory; satellite sites are marked with a trailing asterisk. */
 export interface DirectorySite {
@@ -83,6 +86,13 @@ export class LocationsPage extends BasePage {
     return Promise.all(
       countries.map(async (country) => ({ country, sites: await this.getSites(country) })),
     );
+  }
+
+  /** Yards from the data embedded in this page (__NEXT_DATA__), i.e. the data the list was rendered from. */
+  async getYardData(): Promise<Yard[]> {
+    const url = this.page.url();
+    const { props } = extractNextData(await this.page.content(), url);
+    return validate(LocationsPageSchema, props.pageProps, `pageProps of ${url}`).yards;
   }
 
   async showLocalRepresentatives(): Promise<void> {

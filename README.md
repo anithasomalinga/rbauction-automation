@@ -2,14 +2,14 @@
 
 UI and API test automation framework for [rbauction.com](https://www.rbauction.com), built with
 **Playwright** and **TypeScript**. The first features covered are the locations directory
-(`/lp`), yard pages (`/lp/{slug}`) and inventory search (`/search`, `POST /api/search`).
+(`/lp`), yard pages (`/lp/edmonton-ab`) and inventory search (`/search`, `POST /api/search`).
 
 The framework is designed for **simplicity, reusability, extensibility and maintainability**:
 one runner for UI and API tests, a strict layered structure, and schema-validated, data-driven
 tests that stay stable against a live production site.
 
-> **Status:** framework, API tests (API 1–3) and UI happy-path scenarios (1–4) are complete:
-> 35 tests (17 API, 18 UI). CI is next; see [Requirement coverage](#requirement-coverage) and [Roadmap](#roadmap).
+> **Status:** framework, API tests (API 1–3) and UI scenarios (1–5, including the negative cases) are complete:
+> 43 tests (20 API, 23 UI). CI is next; see [Requirement coverage](#requirement-coverage) and [Roadmap](#roadmap).
 
 ---
 
@@ -48,19 +48,20 @@ Prerequisites: **Node.js 20+** and npm.
 
 ```bash
 npm ci                              # install exact versions from package-lock.json
-npx playwright install chromium     # browser binary (add firefox/webkit if needed)
+npm run install:browsers            # Chromium binary (for others: npm exec playwright install firefox webkit)
 cp .env.example .env                # optional: local overrides
 ```
 
 ## Running tests
 
 ```bash
-npm test                  # everything
-npm run test:api          # API project only (no browser)
-npm run test:ui           # UI project only (Chromium)
-npm run test:smoke        # tests tagged @smoke
-npx playwright test --grep @API1    # one requirement group (@API1, @API2, @API3, @S1 … @S4)
-npm run report            # open the last HTML report
+npm test                      # everything
+npm run test:api              # API project only (no browser)
+npm run test:e2e              # E2E (browser) project only (Chromium)
+npm run test:smoke            # tests tagged @smoke
+npm run test:negative         # tests tagged @negative
+npm test -- --grep @API1      # one requirement group (@API1, @API2, @API3, @S1 … @S5)
+npm run report                # open the last HTML report
 ```
 
 Quality checks:
@@ -71,7 +72,7 @@ npm run lint              # ESLint
 ```
 
 On failure the HTML report contains a **trace, screenshot and video**. Open a trace with
-`npx playwright show-trace test-results/<test>/trace.zip`.
+`npm run trace -- test-results/<test>/trace.zip`.
 
 > **Browsers run headed by default.** rbauction.com is behind Akamai bot protection, which
 > blocks headless browsers with HTTP 403. See [Observations](#observations-about-the-site-under-test).
@@ -107,10 +108,10 @@ Adding an environment (e.g. staging) is one entry in `config/environments.ts`.
 │   │   └── components/              # CookieBanner (auto-dismiss handler)
 │   ├── fixtures/                    # Playwright fixtures; `@fixtures` is the single import for specs
 │   ├── data/                        # reference data, thresholds, payload builders
-│   └── utils/                       # WAF guard, __NEXT_DATA__ parser, schema validation, report counts
+│   └── utils/                       # WAF guard, __NEXT_DATA__ parser, schema validation, report counts, duplicates
 ├── tests/
 │   ├── api/                         # API 1–3 specs
-│   └── ui/                          # Scenario 1–4 specs
+│   └── e2e/                         # Scenario 1–5 specs (browser)
 ├── playwright.config.ts
 ├── eslint.config.mjs
 └── tsconfig.json                    # strict; path aliases @api @pages @fixtures @data @utils @config
@@ -166,12 +167,14 @@ Spec: [`tests/api/api1-auction-sites.spec.ts`](tests/api/api1-auction-sites.spec
 
 | ID | Requirement | How it is verified | Live value (2026-09-29) |
 |---|---|---|---|
-| A1.1 | Payload is JSON and includes a list of yards | Schema-validated `yards` array is non-empty; embedded JSON equals the `/_next/data` route | 74 yards |
+| A1.1 | Payload is JSON and includes a list of yards | `/_next/data` route returns status 200, `content-type: application/json` and a body that parses; schema-validated `yards` array is non-empty; embedded JSON equals the `/_next/data` route | 74 yards |
 | A1.2 | More than 60 locations | `yards.length > 60` | 74 |
-| A1.3 | Each location has a name and a country | Lists any location without a name or country name/code | none missing |
+| A1.3 | Each location has a name and a country | Lists any location without a name or country name/code; the schema requires each code to be three uppercase letters (e.g. `CAN`) | none missing |
 | A1.4 | Includes Edmonton (Canada / CAN) and Phoenix (United States / USA) | Each is found by name and its country checked | ✅ |
 | A1.5 | Each has type Satellite or Permanent; satellite > 15, permanent > 25 | Lists untyped locations; counts per type | 31 / 43 |
 | A1.6 | More than 8 distinct countries, including United States and Canada | Distinct country codes; USA and CAN mapped to their names | 16 |
+| A1.7 | Negative (`@negative`, not in the brief): no location is listed twice | Lists any yard name, or any `oracleSiteId`, that occurs more than once (yards without a site id are left out) | none (2026-09-30) |
+| A1.8 | Negative (`@negative`, not in the brief): the data route with an unknown `buildId` returns no yards | `/_next/data/not-a-real-build/…/lp.json` returns status 404, a non-JSON content type and a body without `yards` | 404, `text/html` (2026-09-30) |
 
 ### API 2: Edmonton yard page JSON (`/lp/edmonton-ab`): ✅ done
 
@@ -179,10 +182,12 @@ Spec: [`tests/api/api2-edmonton-yard.spec.ts`](tests/api/api2-edmonton-yard.spec
 
 | ID | Requirement | How it is verified | Live value (2026-09-29) |
 |---|---|---|---|
-| A2.1 | Payload is JSON | Schema-validated payload contains yard details, events and inventory; embedded JSON equals the `/_next/data` route | ✅ |
+| A2.1 | Payload is JSON | `/_next/data` route returns status 200, `content-type: application/json` and a body that parses; schema-validated payload contains yard details, events and inventory; embedded JSON equals the `/_next/data` route | ✅ |
 | A2.2 | Yard is Edmonton; address includes 1500 Sparrow Drive, Nisku, T9E 8H6; phone and hours present | Name and address fields against reference data; phone has 7+ digits; pickup hours from/to are set | +17809552486, 08:00–17:00 |
 | A2.3 | Count upcoming events; each has a date range and a name; at least one refers to Edmonton or Nisku | Count recorded in the report; each event has a name and ends after it starts; the "Edmonton or Nisku" check is **skipped with a reason** if the yard has no upcoming events | 2 events |
 | A2.4 | Count categories in `itemsInYard` (flattened) > 5; each has a name; `totalAssets` ≥ 0 when present; includes Excavators | Flattens the per-sale-event groups; asserts on **distinct** category names (see note); lists unnamed categories and invalid quantities | 54 entries, 41 distinct |
+| A2.5 | Negative (`@negative`, not in the brief): an unknown yard slug (`/lp/does-not-exist`) returns no yard data | The data route answers 200 with a redirect instruction to `/not-found` and no `yardDetails`; the client rejects with a schema error | redirect to `/not-found` (2026-09-30) |
+| A2.6 | Negative (`@negative`, not in the brief): a yard with no inventory still returns a valid payload | Payload passes the schema; `itemsInYard` is empty (sent as `null`, see observation 8); yard name and events list are present. Uses the first candidate in `SPARSE_YARDS.noInventory` that still has none, and is **skipped with a reason** otherwise | Montreal (2026-09-30) |
 
 **Note on A2.4:** `itemsInYard` is grouped per sale event, so the same category (e.g. Excavators)
 appears in several groups. The test counts **distinct** categories (41), which matches the 41
@@ -202,6 +207,7 @@ page). Each test makes one request for the first page only; the suite never page
 | A3.2 | `results.totalAmount` > 0 | Full hit count read from the first response and recorded in the report | 2,136 |
 | A3.3 | First page is non-empty; each record has an `assetDescription` | Lists the item numbers of any record without one | 60 records, none missing |
 | A3.4 | Log the total count and the first 5 titles | Printed to the console (also kept in the HTML report's stdout); asserts that 5 titles were logged | see below |
+| A3.5 | Negative (`@negative`, not in the brief): a search with no matches (`zzqxnoresultsqa`) returns zero results, not an error | Status 200; `totalAmount` and `returnedAmount` are 0; no records (see observation 5); `fallbackApplied` is true | 0 results (2026-09-30) |
 
 Example A3.4 output:
 
@@ -226,7 +232,7 @@ automatically whenever it gets in the way (`page.addLocatorHandler`).
 
 #### Scenario 1: locations directory (`/lp`): ✅ done
 
-Spec: [`tests/ui/s1-locations-directory.spec.ts`](tests/ui/s1-locations-directory.spec.ts) · tag `@S1`
+Spec: [`tests/e2e/s1-locations-directory.spec.ts`](tests/e2e/s1-locations-directory.spec.ts) · tag `@S1`
 
 | ID | Validation | How it is verified | Live value (2026-09-29) |
 |---|---|---|---|
@@ -243,16 +249,17 @@ The brief has no item 1.8, so none is implemented. The UI counts match API 1 exa
 
 #### Scenario 2: open a yard from the directory: ✅ done
 
-Spec: [`tests/ui/s2-open-yard.spec.ts`](tests/ui/s2-open-yard.spec.ts) · tag `@S2`
+Spec: [`tests/e2e/s2-open-yard.spec.ts`](tests/e2e/s2-open-yard.spec.ts) · tag `@S2`
 
 | ID | Validation | How it is verified |
 |---|---|---|
 | 2.1 | Edmonton is listed under Canada, not a satellite | Found in the Canada list without an asterisk |
 | 2.2 | Clicking Edmonton opens its yard page | URL ends with `/lp/edmonton-ab`; yard name heading is "Edmonton" |
+| 2.3 | Negative (`@negative`, not in the brief): an unknown yard slug (`/lp/does-not-exist`) lands on the not-found page | URL contains `/not-found`; page title is "404 page not found" (a soft 404, see observation 9) |
 
 #### Scenario 3: Edmonton yard page (`/lp/edmonton-ab`): ✅ done
 
-Spec: [`tests/ui/s3-edmonton-yard.spec.ts`](tests/ui/s3-edmonton-yard.spec.ts) · tag `@S3`
+Spec: [`tests/e2e/s3-edmonton-yard.spec.ts`](tests/e2e/s3-edmonton-yard.spec.ts) · tag `@S3`
 
 | ID | Validation | How it is verified | Live value (2026-09-29) |
 |---|---|---|---|
@@ -269,14 +276,29 @@ The 41 carousel cards match the 41 distinct categories from API 2.
 
 #### Scenario 4: Edmonton inventory search (`/search?freeText=Edmonton`): ✅ done
 
-Spec: [`tests/ui/s4-edmonton-search.spec.ts`](tests/ui/s4-edmonton-search.spec.ts) · tag `@S4`
+Spec: [`tests/e2e/s4-edmonton-search.spec.ts`](tests/e2e/s4-edmonton-search.spec.ts) · tag `@S4`
 
 | ID | Validation | How it is verified | Live value (2026-09-29) |
 |---|---|---|---|
 | 4.1 | Search view opens with Edmonton as the query | URL, search box value, results header, first result card visible | ✅ |
 | 4.2 | Displayed total > 0 (parsed, not counted); each first-page lot has a title; location/closing date non-empty where shown; log total and first 5 titles | Total parsed from "1-60 of N" (exact) with the "2.1k results" header as fallback; card fields checked | 2,136 (header 2.1k) |
+| 4.3 | Negative (`@negative`, not in the brief): a search with no matches (`/search?freeText=zzqxnoresultsqa`) says so | Search box keeps the query; the title reads `No exact matches found for "zzqxnoresultsqa"`; no result count header and 0 result cards | ✅ (2026-09-30) |
 
 The displayed total equals `totalAmount` from API 3 (2,136).
+
+#### Scenario 5: yard page with missing data: ✅ done
+
+Spec: [`tests/e2e/s5-yard-missing-data.spec.ts`](tests/e2e/s5-yard-missing-data.spec.ts) · tags `@S5` `@negative` (not in the brief)
+
+| ID | Validation | How it is verified | Live value (2026-09-30) |
+|---|---|---|---|
+| 5.1 | A yard with no inventory has no Items in yard section, and the rest of the page still renders | Yard name, address, Additional information and the seller form are visible; no "Items in yard" heading and 0 category cards | Montreal |
+| 5.2 | A yard with no upcoming events says so | Auction events heading, the "There are currently no events at this location" message and the "See full auction calendar" link are visible; 0 event cards | Calgary |
+
+Inventory and events change, so each test has a short list of candidate yards
+([`src/data/yardPage.ts`](src/data/yardPage.ts)), uses the first one whose embedded page data
+(`__NEXT_DATA__`) still has none, and skips if every candidate has since gained data. On 2026-09-30,
+6 of the 74 yards had no inventory and 47 had no upcoming events.
 
 ## Observations about the site under test
 
@@ -306,13 +328,13 @@ for triage; the tests are written so that they don't hide or trip over them.
 | 6 | Midland's `oracleSiteId` is the **string `"null"`**, not a null value | Low (data quality) |
 | 7 | 8 yards have no `oracleSiteId`, 12 have no pickup hours, and Leipzig has no `marketplaceAdvertisedName` | Low (data completeness) |
 | 8 | `itemsInYard` is `null` (not `[]`) for 6 yards with no inventory | Low (inconsistent contract) |
-| 9 | An unknown yard slug (`/lp/does-not-exist`) returns **HTTP 200** and then redirects to `/not-found` on the client: a "soft 404", which search engines may index | Low (SEO) |
+| 9 | An unknown yard slug (`/lp/does-not-exist`) gets a server **HTTP 307** redirect to `/not-found`, and that page returns **HTTP 200**, not 404: a "soft 404", which search engines may index | Low (SEO) |
 
 ## Conventions
 
 - **Imports:** specs import `test` and `expect` from `@fixtures`, never directly from `@playwright/test`.
 - **Naming:** specs are `api{n}-*.spec.ts` / `s{n}-*.spec.ts`; test titles start with the requirement ID (`A1.4 …`).
-- **Tags:** `@API1`–`@API3` and `@S1`–`@S4` (Scenarios 1–4) per requirement group; `@smoke` for the fast critical subset.
+- **Tags:** `@API1`–`@API3` and `@S1`–`@S5` (Scenarios 1–5) per requirement group; `@smoke` for the fast critical subset; `@negative` for the missing-data, not-found, no-match search, duplicate-location, unknown-`buildId` and unknown-slug cases.
 - **Data-dependent skips:** when a requirement is conditional ("if the yard has events"), use `test.skip(condition, reason)` so the report shows why, instead of passing silently.
 - **Assertions:** give counts a message (`expect(n, 'satellite locations')`), use `expect.soft` when checking several independent items, and list offenders instead of asserting a boolean.
 - **No hard waits:** `waitForTimeout`, `networkidle` and `force: true` are lint errors; use web-first assertions.
@@ -328,8 +350,17 @@ for triage; the tests are written so that they don't hide or trip over them.
 - **A second API runner:** clients, schemas and payload builders don't depend on Playwright's test
   runner, only on a request context. A Vitest + `fetch` or PactumJS suite could reuse the schemas
   and builders if the team wanted API tests outside Playwright.
-- **Further quality checks (not in scope yet):** accessibility (axe-core), visual regression and
-  performance budgets.
+- **Future quality checks (deliberately out of scope for now):**
+  - *Accessibility:* `@axe-core/playwright` scans on the directory, yard and search pages, as a new
+    `@a11y`-tagged spec reusing the existing page objects.
+  - *Visual regression:* `toHaveScreenshot()` on stable regions only (header, directory list), with
+    dynamic content (maps, auction cards) masked. This needs a fixed rendering environment (Docker)
+    to avoid false diffs.
+  - *Performance:* budgets for page load and `/api/search` response time (`ApiResponse.durationMs`
+    is already measured), or Lighthouse CI for Web Vitals.
+
+  These were left out because they are unreliable against a live production site whose content
+  changes daily.
 
 ## Roadmap
 

@@ -17,7 +17,7 @@ const headless = process.env.HEADLESS === 'true';
 /** Firefox, WebKit and mobile are defined up front and enabled with ALL_BROWSERS=true. */
 const allBrowsers = process.env.ALL_BROWSERS === 'true';
 
-const uiTests = ['ui/**/*.spec.ts'];
+const e2eTests = ['e2e/**/*.spec.ts'];
 
 export default defineConfig({
   testDir: './tests',
@@ -49,14 +49,14 @@ export default defineConfig({
     },
     {
       name: 'chromium',
-      testMatch: uiTests,
+      testMatch: e2eTests,
       use: { ...devices['Desktop Chrome'], headless },
     },
     ...(allBrowsers
       ? [
-          { name: 'firefox', testMatch: uiTests, use: { ...devices['Desktop Firefox'], headless } },
-          { name: 'webkit', testMatch: uiTests, use: { ...devices['Desktop Safari'], headless } },
-          { name: 'mobile-chrome', testMatch: uiTests, use: { ...devices['Pixel 7'], headless } },
+          { name: 'firefox', testMatch: e2eTests, use: { ...devices['Desktop Firefox'], headless } },
+          { name: 'webkit', testMatch: e2eTests, use: { ...devices['Desktop Safari'], headless } },
+          { name: 'mobile-chrome', testMatch: e2eTests, use: { ...devices['Pixel 7'], headless } },
         ]
       : []),
   ],

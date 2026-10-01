@@ -1,29 +1,26 @@
 import { test, expect } from '@fixtures';
 import { SEARCH_PATH } from '@pages/SearchResultsPage';
+import { NO_MATCH_SEARCH_TEXT } from '@data/searchPayloads';
 import { EDMONTON } from '@data/yards';
 import { logTotalAndTitles, recordCount } from '@utils/report';
 
-/** Scenario 4: Edmonton inventory search (/search?freeText=Edmonton), happy path. */
+/** Scenario 4: Edmonton inventory search */
 const SEARCH_TEXT = EDMONTON.name;
 const TITLES_TO_LOG = 5;
 
 test.describe('Scenario 4: Edmonton inventory search', { tag: '@S4' }, () => {
-  test.beforeEach(async ({ searchPage }) => {
+  test('4.1 open the Edmonton search', { tag: '@smoke' }, async ({ searchPage }) => {
     await searchPage.open(SEARCH_TEXT);
-  });
 
-  test('4.1 search view opens with Edmonton as the query', { tag: '@smoke' }, async ({
-    searchPage,
-  }) => {
     await expect(searchPage.page).toHaveURL(new RegExp(`${SEARCH_PATH}\\?freeText=${SEARCH_TEXT}`));
     await expect(searchPage.searchInput).toHaveValue(SEARCH_TEXT);
     await expect(searchPage.resultCountHeader).toContainText(`"${SEARCH_TEXT}"`);
     await expect(searchPage.resultCards.first()).toBeVisible();
   });
 
-  test('4.2 displayed total is greater than 0 and first-page lots are complete', async ({
-    searchPage,
-  }) => {
+  test('4.2 Results', async ({ searchPage }) => {
+    await searchPage.open(SEARCH_TEXT);
+
     const displayed = await searchPage.getDisplayedTotal();
     recordCount('displayed total', displayed.total);
     recordCount('header total (abbreviated)', displayed.header);
@@ -42,5 +39,16 @@ test.describe('Scenario 4: Edmonton inventory search', { tag: '@S4' }, () => {
       displayed.total,
       cards.slice(0, TITLES_TO_LOG).map((card) => card.title),
     );
+  });
+
+  test('4.3 a search with no matches says so', { tag: '@negative' }, async ({ searchPage }) => {
+    await searchPage.open(NO_MATCH_SEARCH_TEXT);
+
+    await expect(searchPage.searchInput).toHaveValue(NO_MATCH_SEARCH_TEXT);
+    await expect(searchPage.noMatchesTitle).toHaveText(
+      `No exact matches found for "${NO_MATCH_SEARCH_TEXT}"`,
+    );
+    await expect(searchPage.resultCountHeader).toHaveCount(0);
+    await expect(searchPage.resultCards).toHaveCount(0);
   });
 });

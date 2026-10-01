@@ -17,4 +17,7 @@ export const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 /** ISO 8601 date-time in UTC, e.g. "2026-11-03T15:00:00Z" */
 export const isoDateTime = z.iso.datetime();
 
+/** ISO 3166-1 alpha-3 country code, e.g. "CAN" */
+export const countryCode = z.string().regex(/^[A-Z]{3}$/);
+
 export const count = z.number().int().nonnegative();

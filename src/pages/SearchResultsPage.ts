@@ -27,6 +27,8 @@ export class SearchResultsPage extends BasePage {
   /** e.g. "1-60 of 2136" below the first page of results */
   readonly paginationSummary: Locator;
   readonly resultCards: Locator;
+  /** "No exact matches found for "..."", shown in place of the result count header */
+  readonly noMatchesTitle: Locator;
 
   constructor(page: Page) {
     super(page);
@@ -34,6 +36,7 @@ export class SearchResultsPage extends BasePage {
     this.resultCountHeader = page.getByTestId('search-count-header');
     this.paginationSummary = page.getByText(/^\s*\d[\d,]*\s*-\s*\d[\d,]*\s+of\s+\d[\d,]*\s*$/);
     this.resultCards = page.getByTestId(/^searchResultItemCard-/);
+    this.noMatchesTitle = page.getByTestId('zero-exact-matches-title');
   }
 
   async open(freeText: string): Promise<void> {

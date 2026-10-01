@@ -3,15 +3,15 @@ import { EDMONTON_YARD_PAGE_UI as EXPECTED } from '@data/yardPage';
 import { EDMONTON } from '@data/yards';
 import { recordCount } from '@utils/report';
 
-/** Scenario 3: Edmonton yard page (/lp/edmonton-ab), happy path. */
-test.describe('Scenario 3: Edmonton yard page (/lp/edmonton-ab)', { tag: '@S3' }, () => {
+/** Scenario 3: Edmonton yard page */
+/** Only happy paths in this spec. the negative scenarios are covered in s5 */
+test.describe('Scenario 3: Edmonton yard page', { tag: '@S3' }, () => {
   test.beforeEach(async ({ yardPage }) => {
     await yardPage.open(EDMONTON.slug);
   });
 
-  test('3.1 details show the address, office hours and a phone number', { tag: '@smoke' }, async ({
-    yardPage,
-  }) => {
+  /** details show the address, office hours and a phone number */
+  test('3.1 details', { tag: '@smoke' }, async ({ yardPage }) => {
     for (const part of EXPECTED.addressParts) {
       await expect.soft(yardPage.address, `address includes "${part}"`).toContainText(part);
     }
@@ -21,9 +21,10 @@ test.describe('Scenario 3: Edmonton yard page (/lp/edmonton-ab)', { tag: '@S3' }
     await expect(yardPage.phone).toContainText(EXPECTED.phoneNumber);
   });
 
-  test('3.2 auction events are listed below Details, each with a date range and a title', async ({
-    yardPage,
-  }) => {
+  test('3.2 auction events', async ({ yardPage }) => {
+    // Fail on the data, not on a locator timeout, when the yard has nothing scheduled
+    expect(await yardPage.getUpcomingEventCount(), 'Edmonton has no upcoming events').toBeGreaterThanOrEqual(1);
+
     await expect(yardPage.auctionEventsHeading).toBeVisible();
     // "Below Details" in reading order: on desktop the two sections are side by side
     const sections = await yardPage.getSectionTitles();
@@ -40,16 +41,12 @@ test.describe('Scenario 3: Edmonton yard page (/lp/edmonton-ab)', { tag: '@S3' }
     }
   });
 
-  test('3.3 About this yard mentions weekday drop-off, inspection and pick-up', async ({
-    yardPage,
-  }) => {
+  test('3.3 About this yard', async ({ yardPage }) => {
     await expect(yardPage.aboutHeading).toBeVisible();
     await expect(yardPage.aboutSection).toContainText(EXPECTED.aboutYard);
   });
 
-  test('3.4 Items in yard carousel: more than 5 named categories with quantities', async ({
-    yardPage,
-  }) => {
+  test('3.4 Items in yard carousel', async ({ yardPage }) => {
     const cards = await yardPage.getCategoryCards();
     recordCount('category cards (all slides)', cards.length);
 
@@ -65,17 +62,13 @@ test.describe('Scenario 3: Edmonton yard page (/lp/edmonton-ab)', { tag: '@S3' }
     ).not.toEqual([]);
   });
 
-  test('3.5 Become a seller form is visible with a phone number (not submitted)', async ({
-    yardPage,
-  }) => {
+  test('3.5 Selling call-to-action', async ({ yardPage }) => {
     await expect(yardPage.sellerForm).toBeVisible();
     await expect(yardPage.sellerPhone).toBeVisible();
     await expect(yardPage.sellerPhone).toContainText(EXPECTED.phoneNumber);
   });
 
-  test('3.6 Representatives tab shows cards with a region and contact details', async ({
-    yardPage,
-  }) => {
+  test('3.6 Representatives tab', async ({ yardPage }) => {
     await yardPage.showRepresentatives();
 
     const cards = await yardPage.getRepresentativeCards();

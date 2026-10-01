@@ -1,9 +1,9 @@
 /** Expected copy and content of the locations directory (/lp), Scenario 1. */
 export const DIRECTORY_COPY = {
   heading: 'Locations',
-  title: /auction sites/i,
+  title: 'Our Auction Sites | Ritchie Bros. Auctioneers',
   intro: 'offers over 60 permanent auction sites and local yards',
-  satelliteNote: 'Satellite sites are represented by an asterisk',
+  satelliteNote: 'Satellite sites are represented by an asterisk.*',
   representativesPrompt: 'Search for representatives',
 } as const;
 
