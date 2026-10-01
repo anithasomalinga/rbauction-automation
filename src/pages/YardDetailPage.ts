@@ -104,13 +104,15 @@ export class YardDetailPage extends BasePage {
 
   async getEventCards(): Promise<EventCard[]> {
     await this.eventCards.first().waitFor();
-    const cards = await this.eventCards.all();
-    return Promise.all(
-      cards.map(async (card) => ({
+    // One card at a time: parallel reads can each trigger the cookie banner handler (see getDirectory)
+    const cards: EventCard[] = [];
+    for (const card of await this.eventCards.all()) {
+      cards.push({
         dateRange: (await card.getByTestId(/^auction-card-date-range-/).innerText()).trim(),
         title: (await card.getByRole('heading', { level: 5 }).innerText()).trim(),
-      })),
-    );
+      });
+    }
+    return cards;
   }
 
   async getCategoryCards(): Promise<CategoryCard[]> {
@@ -130,20 +132,19 @@ export class YardDetailPage extends BasePage {
 
   async getRepresentativeCards(): Promise<RepresentativeCard[]> {
     await this.representativeNames.first().waitFor();
-    const names = await this.representativeNames.all();
-    return Promise.all(
-      names.map(async (name) => {
-        // A card is the heading's parent: name, then region/role headings, then contact links
-        const card = name.locator('..');
-        return {
-          name: (await name.innerText()).trim(),
-          region: (await card.getByRole('heading', { level: 6 }).first().innerText()).trim(),
-          contacts: await card
-            .locator('a[href^="tel:"], a[href^="mailto:"]')
-            .evaluateAll((links) => links.map((link) => link.getAttribute('href') ?? '')),
-        };
-      }),
-    );
+    const cards: RepresentativeCard[] = [];
+    for (const name of await this.representativeNames.all()) {
+      // A card is the heading's parent: name, then region/role headings, then contact links
+      const card = name.locator('..');
+      cards.push({
+        name: (await name.innerText()).trim(),
+        region: (await card.getByRole('heading', { level: 6 }).first().innerText()).trim(),
+        contacts: await card
+          .locator('a[href^="tel:"], a[href^="mailto:"]')
+          .evaluateAll((links) => links.map((link) => link.getAttribute('href') ?? '')),
+      });
+    }
+    return cards;
   }
 
   private async getEmbeddedPageProps(): Promise<{ upcomingEvents?: unknown[]; itemsInYard?: unknown[] | null }> {
