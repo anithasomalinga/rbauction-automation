@@ -1,5 +1,6 @@
 import { test as base } from '@playwright/test';
-import { autoDismissCookieBanner } from '@pages/components/CookieBanner';
+import { getEnvironment } from '@config/environments';
+import { acceptCookieConsent, autoDismissCookieBanner } from '@pages/components/CookieBanner';
 import { LocationsPage } from '@pages/LocationsPage';
 import { SearchResultsPage } from '@pages/SearchResultsPage';
 import { YardDetailPage } from '@pages/YardDetailPage';
@@ -10,8 +11,15 @@ export interface UiFixtures {
   searchPage: SearchResultsPage;
 }
 
-/** Page objects. Every page gets the cookie banner handler before a test touches it. */
+/**
+ * Page objects. Every browser context starts with cookie consent given, and every page gets the
+ * cookie banner handler as a fallback, before a test touches it.
+ */
 export const test = base.extend<UiFixtures>({
+  context: async ({ context }, use) => {
+    await acceptCookieConsent(context, getEnvironment().baseURL);
+    await use(context);
+  },
   page: async ({ page }, use) => {
     await autoDismissCookieBanner(page);
     await use(page);

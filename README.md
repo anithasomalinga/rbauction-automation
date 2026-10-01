@@ -218,14 +218,18 @@ rbauction.com sits behind Akamai's bot protection, which refuses traffic that lo
 The site shows a cookie consent banner with an "I understand" button. It appears a moment after
 the page loads, at no fixed time, and can cover the controls a test needs.
 
-- **How it is handled:** dismissing it at a fixed step would be unreliable, so a Playwright
-  locator handler ([`CookieBanner.ts`](src/pages/components/CookieBanner.ts)) clicks the banner
-  away whenever it gets in the way of an action. It is registered for every page through the fixtures.
-- **What went wrong on CI:** two tests failed on the first CI run. A page object read all 16
-  country lists at the same time, each read triggered the handler, and after the first one
-  dismissed the banner the others kept waiting for a banner that was already gone.
-- **The fix:** page objects now read items one at a time. The problem never appeared on a local
-  machine, only under CI timing.
+- **First approach:** a Playwright locator handler
+  ([`CookieBanner.ts`](src/pages/components/CookieBanner.ts)) clicked the banner away whenever
+  it got in the way of an action.
+- **What went wrong:** it worked on a laptop but not on smaller machines. On the first CI run two
+  tests failed: a page object read all 16 country lists at the same time, each read triggered the
+  handler, and after the first one dismissed the banner the others kept waiting for a banner that
+  was already gone. In a later run, an assertion reached its 10-second timeout while the handler
+  was still dismissing the banner.
+- **How it is handled now:** every browser starts with cookie consent already given, as for a
+  returning visitor, by setting the three cookies that "I understand" stores. The banner no
+  longer appears, so there is nothing to click. The handler stays as a fallback in case those
+  cookies change, and page objects read items one at a time.
 
 ## AI Assistance
 
