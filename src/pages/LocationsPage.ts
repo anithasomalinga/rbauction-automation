@@ -83,9 +83,13 @@ export class LocationsPage extends BasePage {
   /** The full directory: every country heading with the sites listed under it. */
   async getDirectory(): Promise<CountryGroup[]> {
     const countries = await this.getCountryNames();
-    return Promise.all(
-      countries.map(async (country) => ({ country, sites: await this.getSites(country) })),
-    );
+    // One country at a time: parallel waits each trigger the cookie banner handler, and all but
+    // the first then wait for a banner that is already gone
+    const directory: CountryGroup[] = [];
+    for (const country of countries) {
+      directory.push({ country, sites: await this.getSites(country) });
+    }
+    return directory;
   }
 
   /** Yards from the data embedded in this page (__NEXT_DATA__), i.e. the data the list was rendered from. */
