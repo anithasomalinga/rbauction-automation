@@ -170,3 +170,7 @@ the test step by step; open it from the report, or with:
 ```bash
 npm run trace -- test-results/<test-folder>/trace.zip
 ```
+
+## AI Assistance
+
+Claude was used as an AI-assisted development tool during this assignment for code suggestions, troubleshooting and reviewing implementation approaches. The overall framework design, implementation decisions, test scenarios and final validation were reviewed and completed by me.
